@@ -41,8 +41,9 @@ type dialerConf struct {
 }
 
 var (
-	globalDialerMap    map[dialerConf]*grpc.ClientConn
-	globalDialerAccess sync.Mutex
+	globalDialerMap        map[dialerConf]*grpc.ClientConn
+	globalDialerGenUnixMap map[dialerConf]int64
+	globalDialerAccess     sync.Mutex
 )
 
 func dialgRPC(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (net.Conn, error) {
@@ -83,8 +84,13 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 	sockopt := streamSettings.SocketSettings
 	grpcSettings := streamSettings.ProtocolSettings.(*Config)
 
-	if client, found := globalDialerMap[dialerConf{dest, streamSettings}]; found && client.GetState() != connectivity.Shutdown {
-		return client, nil
+	key := dialerConf{dest, streamSettings}
+	if client, found := globalDialerMap[key]; found && client.GetState() != connectivity.Shutdown {
+		now := time.Now()
+		if genUnix, ok := globalDialerGenUnixMap[key]; ok && now.Unix()-genUnix <= 180 {
+			return client, nil
+		}
+		//return client, nil
 	}
 
 	dialOptions := []grpc.DialOption{
@@ -182,5 +188,6 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 		dialOptions...,
 	)
 	globalDialerMap[dialerConf{dest, streamSettings}] = conn
+	globalDialerGenUnixMap[key] = time.Now().Unix()
 	return conn, err
 }
