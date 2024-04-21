@@ -78,6 +78,7 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 
 	if globalDialerMap == nil {
 		globalDialerMap = make(map[dialerConf]*grpc.ClientConn)
+		globalDialerGenUnixMap = make(map[dialerConf]int64)
 	}
 	tlsConfig := tls.ConfigFromStreamSettings(streamSettings)
 	realityConfig := reality.ConfigFromStreamSettings(streamSettings)
