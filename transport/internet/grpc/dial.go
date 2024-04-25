@@ -87,11 +87,14 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 	grpcSettings := streamSettings.ProtocolSettings.(*Config)
 
 	key := dialerConf{dest, streamSettings}
-	if client, found := globalDialerMap[key]; found && client.GetState() != connectivity.Shutdown {
+	oldClient, oldFound := globalDialerMap[key]
+	isCloseOld := false
+	if oldFound && oldClient.GetState() != connectivity.Shutdown {
 		now := time.Now()
-		if genUnix, ok := globalDialerGenUnixMap[key]; ok && now.Unix()-genUnix <= 180 {
-			return client, nil
+		if genUnix, ok := globalDialerGenUnixMap[key]; ok && now.Unix()-genUnix <= 300 {
+			return oldClient, nil
 		}
+		isCloseOld = true
 		//return client, nil
 	}
 
@@ -195,7 +198,10 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 		From:   "GRPC",
 		To:     "reGenGrpcConnect",
 		Status: log.AccessAccepted,
-		Detour: "local",
+		Detour: "grpc",
 	})
+	if isCloseOld {
+		_ = oldClient.Close()
+	}
 	return conn, err
 }
