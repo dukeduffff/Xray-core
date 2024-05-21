@@ -201,7 +201,10 @@ func getGrpcClient(ctx context.Context, dest net.Destination, streamSettings *in
 		Detour: "grpc",
 	})
 	if isCloseOld {
-		_ = oldClient.Close()
+		go func() {
+			time.Sleep(30 * time.Minute)
+			_ = oldClient.Close()
+		}()
 	}
 	return conn, err
 }
